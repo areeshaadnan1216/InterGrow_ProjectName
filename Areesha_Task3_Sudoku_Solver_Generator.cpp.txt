@@ -1,0 +1,208 @@
+/*
+    InternGrow C++ Programming Track
+    TASK 3: Intelligent Sudoku Solver & Generator
+   _______________________________________________
+    by : Areesha Adnan
+         Student ID : IGO-00948
+    _______________________________________________
+*/
+
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
+#include <vector>
+#include <algorithm>
+#include <sstream>
+using namespace std;
+
+
+string toStr(int value) {
+    ostringstream oss;
+    oss << value;
+    return oss.str();
+}
+
+const int N = 9;
+int grid[N][N];
+
+// ---------- Print the grid ----------
+void printGrid() {
+    for (int r = 0; r < N; r++) {
+        if (r % 3 == 0 && r != 0) cout << "------+-------+------\n";
+        for (int c = 0; c < N; c++) {
+            if (c % 3 == 0 && c != 0) cout << "| ";
+            cout << (grid[r][c] == 0 ? "." : toStr(grid[r][c])) << " ";
+        }
+        cout << "\n";
+    }
+}
+
+// ---------- Check if placing num at (row, col) is valid ----------
+bool isSafe(int board[N][N], int row, int col, int num) {
+    for (int x = 0; x < N; x++) {
+        if (board[row][x] == num) return false;
+        if (board[x][col] == num) return false;
+    }
+    int startRow = row - row % 3;
+    int startCol = col - col % 3;
+    for (int r = 0; r < 3; r++)
+        for (int c = 0; c < 3; c++)
+            if (board[startRow + r][startCol + c] == num) return false;
+    return true;
+}
+
+// ---------- Find first empty cell ----------
+bool findEmpty(int board[N][N], int &row, int &col) {
+    for (row = 0; row < N; row++)
+        for (col = 0; col < N; col++)
+            if (board[row][col] == 0) return true;
+    return false;
+}
+
+// ---------- Backtracking Solver ----------
+bool solveSudoku(int board[N][N]) {
+    int row, col;
+    if (!findEmpty(board, row, col)) return true; // solved
+
+    for (int num = 1; num <= 9; num++) {
+        if (isSafe(board, row, col, num)) {
+            board[row][col] = num;
+            if (solveSudoku(board)) return true;
+            board[row][col] = 0; // backtrack
+        }
+    }
+    return false;
+}
+
+// ---------- UPGRADE FEATURE: Puzzle Generator ----------
+
+// Fill the diagonal 3x3 boxes first (they are independent, speeds up generation)
+void fillDiagonalBox(int box) {
+    vector<int> nums;
+    for (int i = 1; i <= 9; i++) nums.push_back(i);
+    random_shuffle(nums.begin(), nums.end());
+
+    int idx = 0;
+    for (int r = 0; r < 3; r++)
+        for (int c = 0; c < 3; c++)
+            grid[box + r][box + c] = nums[idx++];
+}
+
+bool fillRemaining(int board[N][N], int row, int col) {
+    if (col >= N && row < N - 1) { row++; col = 0; }
+    if (row >= N && col >= N) return true;
+
+    if (row < 3) { if (col < 3) col = 3; }
+    else if (row < 6) { if (col == (row / 3) * 3) col += 3; }
+    else { if (col == 6) { row++; col = 0; if (row >= N) return true; } }
+
+    for (int num = 1; num <= 9; num++) {
+        if (isSafe(board, row, col, num)) {
+            board[row][col] = num;
+            if (fillRemaining(board, row, col + 1)) return true;
+            board[row][col] = 0;
+        }
+    }
+    return false;
+}
+
+void generateFullSolution() {
+    for (int r = 0; r < N; r++)
+        for (int c = 0; c < N; c++)
+            grid[r][c] = 0;
+
+    fillDiagonalBox(0);
+    fillDiagonalBox(3);
+    fillDiagonalBox(6);
+    fillRemaining(grid, 0, 3);
+}
+
+// Remove cells based on difficulty. Returns puzzle in 'grid'.
+void removeCells(int difficultyLevel) {
+    int cellsToRemove;
+    switch (difficultyLevel) {
+        case 1: cellsToRemove = 35; break; // Easy
+        case 2: cellsToRemove = 45; break; // Medium
+        case 3: cellsToRemove = 55; break; // Hard
+        default: cellsToRemove = 40;
+    }
+
+    while (cellsToRemove > 0) {
+        int row = rand() % N;
+        int col = rand() % N;
+        if (grid[row][col] != 0) {
+            grid[row][col] = 0;
+            cellsToRemove--;
+        }
+    }
+}
+
+void generatePuzzle(int difficultyLevel) {
+    generateFullSolution();
+    removeCells(difficultyLevel);
+}
+
+int main() {
+    srand(static_cast<unsigned int>(time(NULL)));
+
+    cout << "=========================================\n";
+    cout << " InternGrow - Intelligent Sudoku Solver & Generator\n";
+    cout << "=========================================\n";
+
+    int choice;
+    cout << "\n1. Solve a Sudoku puzzle (enter your own)\n";
+    cout << "2. Generate a new Sudoku puzzle\n";
+    cout << "Choice: ";
+    cin >> choice;
+
+    if (choice == 1) {
+        cout << "\nEnter the 9x9 grid row by row (use 0 for empty cells):\n";
+        for (int r = 0; r < N; r++)
+            for (int c = 0; c < N; c++)
+                cin >> grid[r][c];
+
+        cout << "\nInput Puzzle:\n";
+        printGrid();
+
+        if (solveSudoku(grid)) {
+            cout << "\nSolved Puzzle:\n";
+            printGrid();
+        } else {
+            cout << "\nNo solution exists for this puzzle.\n";
+        }
+    } else if (choice == 2) {
+        int difficulty;
+        cout << "\nSelect difficulty:\n1. Easy\n2. Medium\n3. Hard\nChoice: ";
+        cin >> difficulty;
+
+        generatePuzzle(difficulty);
+
+        cout << "\nGenerated Puzzle:\n";
+        printGrid();
+
+        char showSolution;
+        cout << "\nShow solution? (y/n): ";
+        cin >> showSolution;
+        if (showSolution == 'y' || showSolution == 'Y') {
+            int solved[N][N];
+            for (int r = 0; r < N; r++)
+                for (int c = 0; c < N; c++)
+                    solved[r][c] = grid[r][c];
+
+            solveSudoku(solved);
+            cout << "\nSolution:\n";
+            for (int r = 0; r < N; r++) {
+                if (r % 3 == 0 && r != 0) cout << "------+-------+------\n";
+                for (int c = 0; c < N; c++) {
+                    if (c % 3 == 0 && c != 0) cout << "| ";
+                    cout << solved[r][c] << " ";
+                }
+                cout << "\n";
+            }
+        }
+    } else {
+        cout << "Invalid choice.\n";
+    }
+
+    return 0;
+}

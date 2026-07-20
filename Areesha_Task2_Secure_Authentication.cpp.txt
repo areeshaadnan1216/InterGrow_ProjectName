@@ -1,0 +1,183 @@
+/*
+    InternGrow C++ Programming Track
+    TASK 2: Secure User Authentication System
+  _______________________________________________
+    by : Areesha Adnan
+         Student ID : IGO-00948
+    _______________________________________________
+    
+*/
+
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <string>
+#include <vector>
+#include <map>
+#include <ctime>
+using namespace std;
+
+const string USER_FILE = "users.txt";
+const string LOCK_FILE = "lockout.txt";
+const int MAX_ATTEMPTS = 3;
+const int LOCKOUT_SECONDS = 30; // lockout duration
+
+// ---------- Simple obfuscation "hash" (demo only, not real crypto) ----------
+string simpleHash(const string &input) {
+    string result = input;
+    for (size_t i = 0; i < result.size(); i++) {
+        result[i] = result[i] + 3; // Caesar-shift style obfuscation
+    }
+    return result;
+}
+
+// ---------- User storage ----------
+bool usernameExists(const string &username) {
+    ifstream file(USER_FILE.c_str());
+    string u, p;
+    while (file >> u >> p) {
+        if (u == username) return true;
+    }
+    return false;
+}
+
+void registerUser() {
+    string username, password;
+    cout << "Choose a username: ";
+    cin >> username;
+
+    if (usernameExists(username)) {
+        cout << "Username already exists. Please choose another.\n";
+        return;
+    }
+
+    cout << "Choose a password: ";
+    cin >> password;
+
+    ofstream file(USER_FILE.c_str(), ios::app);
+    file << username << " " << simpleHash(password) << "\n";
+    file.close();
+
+    cout << "Registration successful!\n";
+}
+
+bool validateCredentials(const string &username, const string &password) {
+    ifstream file(USER_FILE.c_str());
+    string u, p;
+    string hashed = simpleHash(password);
+    while (file >> u >> p) {
+        if (u == username && p == hashed) return true;
+    }
+    return false;
+}
+
+// ---------- Lockout tracking ----------
+struct LockInfo {
+    int attempts;
+    long lockUntil; // epoch seconds; 0 means not locked
+};
+
+map<string, LockInfo> loadLockData() {
+    map<string, LockInfo> data;
+    ifstream file(LOCK_FILE.c_str());
+    string username;
+    int attempts;
+    long lockUntil;
+    while (file >> username >> attempts >> lockUntil) {
+        LockInfo info;
+        info.attempts = attempts;
+        info.lockUntil = lockUntil;
+        data[username] = info;
+    }
+    return data;
+}
+
+void saveLockData(const map<string, LockInfo> &data) {
+    ofstream file(LOCK_FILE.c_str(), ios::trunc);
+    for (map<string, LockInfo>::const_iterator it = data.begin(); it != data.end(); ++it) {
+        file << it->first << " " << it->second.attempts << " " << it->second.lockUntil << "\n";
+    }
+}
+
+long nowEpoch() {
+    return static_cast<long>(time(NULL));
+}
+
+// ---------- UPGRADE FEATURE: Lockout mechanism ----------
+void loginUser() {
+    string username, password;
+    cout << "Username: ";
+    cin >> username;
+
+    map<string, LockInfo> lockData = loadLockData();
+    LockInfo info = {0, 0};
+    if (lockData.find(username) != lockData.end()) {
+        info = lockData[username];
+    }
+
+    long now = nowEpoch();
+    if (info.lockUntil > now) {
+        long remaining = info.lockUntil - now;
+        cout << "Account locked due to too many failed attempts. Try again in "
+             << remaining << " seconds.\n";
+        return;
+    }
+
+    cout << "Password: ";
+    cin >> password;
+
+    if (!usernameExists(username)) {
+        cout << "No such username. Please register first.\n";
+        return;
+    }
+
+    if (validateCredentials(username, password)) {
+        cout << "Login successful! Welcome, " << username << ".\n";
+        // reset attempts on success
+        info.attempts = 0;
+        info.lockUntil = 0;
+        lockData[username] = info;
+        saveLockData(lockData);
+    } else {
+        info.attempts += 1;
+        cout << "Incorrect password. Attempt " << info.attempts << " of " << MAX_ATTEMPTS << ".\n";
+
+        if (info.attempts >= MAX_ATTEMPTS) {
+            info.lockUntil = nowEpoch() + LOCKOUT_SECONDS;
+            info.attempts = 0; // reset counter, lock is now active
+            cout << "Too many failed attempts. Account locked for "
+                 << LOCKOUT_SECONDS << " seconds.\n";
+        }
+
+        lockData[username] = info;
+        saveLockData(lockData);
+    }
+}
+
+int main() {
+    cout << "=========================================\n";
+    cout << " InternGrow - Secure User Authentication System\n";
+    cout << "=========================================\n";
+
+    int choice;
+    do {
+        cout << "\n1. Register\n2. Login\n3. Exit\nChoice: ";
+        cin >> choice;
+
+        switch (choice) {
+            case 1:
+                registerUser();
+                break;
+            case 2:
+                loginUser();
+                break;
+            case 3:
+                cout << "Goodbye!\n";
+                break;
+            default:
+                cout << "Invalid choice.\n";
+        }
+    } while (choice != 3);
+
+    return 0;
+}

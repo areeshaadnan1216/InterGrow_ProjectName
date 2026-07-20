@@ -1,0 +1,188 @@
+/*
+    InternGrow C++ Programming Track
+    TASK 1: Automated Semester CGPA Planner
+    _______________________________________________
+    by : Areesha Adnan
+         Student ID : IGO-00948
+    _______________________________________________
+    
+*/
+
+#include <iostream>
+#include <vector>
+#include <string>
+#include <iomanip>
+#include <sstream>
+using namespace std;
+
+
+string toStr(int value) {
+    ostringstream oss;
+    oss << value;
+    return oss.str();
+}
+
+// ---------- Grade and Marks  ----------
+double gradeToPoint(const string &grade) {
+    if (grade == "A+")  return 4.0;
+    if (grade == "A")   return 4.0;
+    if (grade == "A-")  return 3.7;
+    if (grade == "B+")  return 3.3;
+    if (grade == "B")   return 3.0;
+    if (grade == "B-")  return 2.7;
+    if (grade == "C+")  return 2.3;
+    if (grade == "C")   return 2.0;
+    if (grade == "C-")  return 1.7;
+    if (grade == "D")   return 1.0;
+    if (grade == "F")   return 0.0;
+    return -1.0; // invalid
+}
+
+struct Course {
+    string name;
+    string grade;
+    int creditHours;
+};
+
+struct Semester {
+    string title;
+    vector<Course> courses;
+    double gpa;
+    double totalCredits;
+};
+
+// ---------- Compute GPA of one semester ----------
+double computeSemesterGPA(const vector<Course> &courses, double &creditSum) {
+    double qualityPoints = 0.0;
+    creditSum = 0.0;
+    for (size_t i = 0; i < courses.size(); i++) {
+        double gp = gradeToPoint(courses[i].grade);
+        qualityPoints += gp * courses[i].creditHours;
+        creditSum += courses[i].creditHours;
+    }
+    if (creditSum == 0) return 0.0;
+    return qualityPoints / creditSum;
+}
+
+// ---------- Compute Cumulative CGPA ----------
+double computeCGPA(const vector<Semester> &semesters, double &totalCreditsOut) {
+    double totalQuality = 0.0;
+    totalCreditsOut = 0.0;
+    for (size_t i = 0; i < semesters.size(); i++) {
+        totalQuality += semesters[i].gpa * semesters[i].totalCredits;
+        totalCreditsOut += semesters[i].totalCredits;
+    }
+    if (totalCreditsOut == 0) return 0.0;
+    return totalQuality / totalCreditsOut;
+}
+
+// ---------- Input one semester's data ----------
+Semester inputSemester(int semNumber) {
+    Semester sem;
+    sem.title = "Semester " + toStr(semNumber);
+
+    int numCourses;
+    cout << "\nEnter number of courses in " << sem.title << ": ";
+    cin >> numCourses;
+
+    for (int i = 0; i < numCourses; i++) {
+        Course c;
+        cout << "  Course " << (i + 1) << " name: ";
+        cin >> c.name;
+
+        while (true) {
+            cout << "  Grade (A+/A/A-/B+/B/B-/C+/C/C-/D/F): ";
+            cin >> c.grade;
+            if (gradeToPoint(c.grade) >= 0) break;
+            cout << "  Invalid grade, try again.\n";
+        }
+
+        cout << "  Credit hours: ";
+        cin >> c.creditHours;
+
+        sem.courses.push_back(c);
+    }
+
+    double creditSum;
+    sem.gpa = computeSemesterGPA(sem.courses, creditSum);
+    sem.totalCredits = creditSum;
+    return sem;
+}
+
+// ---------- UPGRADE FEATURE ----------
+
+void predictiveSimulation(double currentCGPA, double currentCredits, double targetCGPA) {
+    cout << "\n--- Predictive CGPA Simulation ---\n";
+
+    double remainingCredits;
+    cout << "Enter total remaining credit hours (all future semesters combined): ";
+    cin >> remainingCredits;
+
+    if (remainingCredits <= 0) {
+        cout << "No remaining credits to plan for.\n";
+        return;
+    }
+
+    double currentQualityPoints = currentCGPA * currentCredits;
+    double totalCreditsAfter = currentCredits + remainingCredits;
+    double requiredTotalQuality = targetCGPA * totalCreditsAfter;
+    double neededQualityPoints = requiredTotalQuality - currentQualityPoints;
+    double neededGPA = neededQualityPoints / remainingCredits;
+
+    cout << fixed << setprecision(2);
+    cout << "Current CGPA: " << currentCGPA << " over " << currentCredits << " credit hours\n";
+    cout << "Target CGPA: " << targetCGPA << "\n";
+    cout << "Remaining credit hours: " << remainingCredits << "\n";
+
+    if (neededGPA < 0.0) {
+        cout << "Target already secured! You can average as low as 0.00 GPA and still meet the target.\n";
+    } else if (neededGPA > 4.0) {
+        cout << "Target NOT achievable: it would require an average GPA of "
+             << neededGPA << ", which exceeds the maximum possible 4.00.\n";
+    } else {
+        cout << "You need an average GPA of " << neededGPA
+             << " across your remaining " << remainingCredits << " credit hours to reach a CGPA of "
+             << targetCGPA << ".\n";
+    }
+}
+
+int main() {
+    cout << "=========================================\n";
+    cout << " InternGrow - Automated Semester CGPA Planner\n";
+    cout << "=========================================\n";
+
+    vector<Semester> semesters;
+    int numSemesters;
+    cout << "\nHow many completed semesters do you want to enter? ";
+    cin >> numSemesters;
+
+    for (int i = 1; i <= numSemesters; i++) {
+        Semester s = inputSemester(i);
+        semesters.push_back(s);
+    }
+
+    cout << "\n---------------- Report ----------------\n";
+    cout << fixed << setprecision(2);
+    for (size_t i = 0; i < semesters.size(); i++) {
+        cout << semesters[i].title << " -> GPA: " << semesters[i].gpa
+             << "  (Credits: " << semesters[i].totalCredits << ")\n";
+    }
+
+    double totalCredits;
+    double cgpa = computeCGPA(semesters, totalCredits);
+    cout << "\nCumulative CGPA: " << cgpa << " over " << totalCredits << " total credit hours\n";
+
+    // ----- Upgrade Feature -----
+    char choice;
+    cout << "\nWould you like to run the Predictive CGPA Simulation? (y/n): ";
+    cin >> choice;
+    if (choice == 'y' || choice == 'Y') {
+        double targetCGPA;
+        cout << "Enter your target CGPA: ";
+        cin >> targetCGPA;
+        predictiveSimulation(cgpa, totalCredits, targetCGPA);
+    }
+
+    cout << "\nThank you for using InternGrow CGPA Planner.\n";
+    return 0;
+}
